@@ -168,10 +168,9 @@ def mapfusion_draw_det_results(type):
                         frame_info["boxes"] = boxes
                         frame_info["ids"] = ids
                     else:
-                        frame_info["labels"].append(labels)
-                        frame_info["boxes"].append(boxes)
-                        frame_info["ids"].append(ids)
-
+                        frame_info["labels"].extend(labels)
+                        frame_info["boxes"].extend(boxes)
+                        frame_info["ids"].extend(ids)
 
                     result_infos.update({frame_name: frame_info}) 
 
@@ -179,6 +178,7 @@ def mapfusion_draw_det_results(type):
     save_img_folder = os.path.join("data/{}_imgs".format(type))
     if not os.path.exists(save_img_folder):
         os.mkdir(save_img_folder)
+
 
     for result_frame_name in result_infos.keys():
         # load pcd

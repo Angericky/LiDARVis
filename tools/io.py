@@ -56,6 +56,7 @@ def load_trk_labels_from_single_sequence(result_sequence_path):
         ids.append([int(label[1])])
 
         frame_info = {"labels": labels, "boxes": boxes, "ids": ids}
+
         sequence_info[frame_id] = frame_info
 
     return sequence_info

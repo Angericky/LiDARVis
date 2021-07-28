@@ -1,4 +1,4 @@
 pypcd/
-data/
+data/*
 det_imgs/
 trk_imgs/
