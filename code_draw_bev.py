@@ -94,7 +94,7 @@ def draw_boxes_on_bev(bev, boxes, pc_range, resolution, pred=True, ids=None):
 
         if ids: 
             id = ids[idx]
-            cv2.putText(bev, str(id), p0, cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
+            cv2.putText(bev, str(id), p0, cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 4)
     
     return bev
 
