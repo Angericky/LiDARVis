@@ -136,11 +136,12 @@ def mapfusion_draw_det_results(type):
         proposed_result_folder = "data/results/"
         classes_folder = os.listdir(proposed_result_folder)
         for class_folder in classes_folder:
-
-            result_sequence_names = os.listdir(os.path.join(proposed_result_folder, class_folder))
+            classes_folder_path = os.path.join(proposed_result_folder, class_folder + "/data")
+            result_sequence_names = os.listdir(classes_folder_path)
             result_sequence_names.sort()
+
             for result_sequence_name in result_sequence_names:
-                result_sequence_path = os.path.join(os.path.join(proposed_result_folder, class_folder), result_sequence_name)
+                result_sequence_path = os.path.join(classes_folder_path, result_sequence_name)
                 sequence_info = io.load_trk_labels_from_single_sequence(result_sequence_path) # (Type, h, w, l, x, y, z, theta, conf)
             
                 sequence_id = result_sequence_name.split('.')[0]
