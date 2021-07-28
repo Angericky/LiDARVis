@@ -1,25 +1,30 @@
 import os
-from tools import io
 import numpy as np
 from pathlib import Path
 from pypcd import pypcd
 import cv2
+from tqdm import tqdm
 
+from tools import io
 
 def read_file_apolloscape(path, tries=2, num_point_feature=4, painted=False):
-    assert path.exists()
-    pc = pypcd.PointCloud.from_path(path)
-    x = pc.pc_data['x']
-    y = pc.pc_data['y']
-    z = pc.pc_data['z']
-    if 'intensity' in pc.fields:
-        intensity = pc.pc_data['intensity'].astype(np.float32) / 255.0
-    else:
-        intensity = np.ones_like(x)
-    pointcloud = np.vstack((x, y, z, intensity))
-    pointcloud = pointcloud.transpose(1, 0)
-    pointcloud = pointcloud.reshape(-1, 4).astype(np.float32)
-    return pointcloud
+    try:
+        assert path.exists()
+        pc = pypcd.PointCloud.from_path(path)
+        x = pc.pc_data['x']
+        y = pc.pc_data['y']
+        z = pc.pc_data['z']
+        if 'intensity' in pc.fields:
+            intensity = pc.pc_data['intensity'].astype(np.float32) / 255.0
+        else:
+            intensity = np.ones_like(x)
+        pointcloud = np.vstack((x, y, z, intensity))
+        pointcloud = pointcloud.transpose(1, 0)
+        pointcloud = pointcloud.reshape(-1, 4).astype(np.float32)
+        return pointcloud
+    except:
+        print("path: {} not exists".format(path))
+
 
 
 def convert_lidar_coords_to_image_coords(points, H, W, pc_range, resolution):
@@ -184,8 +189,14 @@ def mapfusion_draw_det_results(type):
     if not os.path.exists(save_img_folder):
         os.mkdir(save_img_folder)
 
+    keys = list(result_infos.keys())
+    keys.sort()
 
-    for result_frame_name in result_infos.keys():
+    total = len(keys)
+
+
+    for i in tqdm(range(len(keys))):
+        result_frame_name = keys[i]
         # load pcd
         frame_id = result_frame_name
         pcd_path = os.path.join(PCDS_ROOT, frame_id.split('.')[0] + '.pcd')
@@ -214,4 +225,5 @@ def mapfusion_draw_det_results(type):
         # cv2.waitKey(0)
         
         cv2.imwrite(os.path.join(save_img_folder, frame_id.split('.')[0] + '.png'), bev)
-        print("generate frame: {}".format(frame_id.split('.')[0]))
+        #print("generate frame: {}".format(frame_id.split('.')[0]))
+
