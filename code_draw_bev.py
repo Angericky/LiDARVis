@@ -91,6 +91,10 @@ def draw_boxes_on_bev(bev, boxes, pc_range, resolution, pred=True, ids=None):
         cv2.line(bev, p1, p2, color, 1)
         cv2.line(bev, p2, p3, color, 1)
         cv2.line(bev, p3, p0, color, 1)
+
+        if ids: 
+            id = ids[idx]
+            cv2.putText(bev, str(id), p0, cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
     
     return bev
 
@@ -202,7 +206,7 @@ def mapfusion_draw_det_results(type):
         elif type == "trk":
             boxes = result_infos[result_frame_name]["boxes"]
             ids = result_infos[result_frame_name]["ids"]
-            bev = draw_boxes_on_bev(bev, boxes, pc_range, resolution, ids)
+            bev = draw_boxes_on_bev(bev, boxes, pc_range, resolution, ids=ids)
 
 
         # cv2.imshow('bev', bev)

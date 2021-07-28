@@ -28,6 +28,9 @@ def load_trk_labels_from_single_sequence(result_sequence_path):
             (h, w, l, x, y, z, theta) are in camera coordinate follwing KITTI convention
         
         Return: [(object_id, type, h, w, l, x, y, z, theta, conf) x frames]
+
+        bboxes: [[], [], []]
+        ids: [1,2,3]
     '''
 
     with open(result_sequence_path, 'r') as F:
@@ -53,7 +56,7 @@ def load_trk_labels_from_single_sequence(result_sequence_path):
         box.extend(label[3:-1])
         boxes.append(list(map(float, box)))
 
-        ids.append([int(label[1])])
+        ids.append(int(label[1]))
 
         frame_info = {"labels": labels, "boxes": boxes, "ids": ids}
 
