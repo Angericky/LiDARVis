@@ -209,4 +209,4 @@ def mapfusion_draw_det_results(type):
         # cv2.waitKey(0)
         
         cv2.imwrite(os.path.join(save_img_folder, frame_id.split('.')[0] + '.png'), bev)
-
+        print("generate frame: {}".format(frame_id.split('.')[0]))
