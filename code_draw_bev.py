@@ -143,6 +143,7 @@ def mapfusion_draw_det_results(type):
     elif type == "trk":
         proposed_result_folder = "data/results/"
         classes_folder = os.listdir(proposed_result_folder)
+        classes_folder.sort()
         for class_folder in classes_folder:
             classes_folder_path = os.path.join(proposed_result_folder, class_folder + "/data")
             result_sequence_names = []

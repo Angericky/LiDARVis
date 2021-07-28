@@ -24,7 +24,9 @@ def load_det_labels_from_single_frame(result_frame_path):
 def load_trk_labels_from_single_sequence(result_sequence_path):
     '''Reading labels from a txt file
         
-        Input: (frame_id, object_id, type, 0, 0, alpha, [bbox2d_trk x 4],  w, l, x, y, z, theta, conf, h]) (CenterPoint format)
+        Input: (frame_id, object_id, type, 0, 0, [bbox2d_trk x 4], conf, 
+                h. w, l x, y, z, theta,]) (CenterPoint format)
+            
             (h, w, l, x, y, z, theta) are in camera coordinate follwing KITTI convention
         
         Return: [(object_id, type, h, w, l, x, y, z, theta, conf) x frames]
@@ -51,9 +53,8 @@ def load_trk_labels_from_single_sequence(result_sequence_path):
         
         labels.append(label[2])
 
-        h = label[-1]
-        box = [h]
-        box.extend(label[3:-1])
+        # change sequence order from (h, w, l) to (l, h, w) to draw points
+        box = (label[5:6] + label[3:5]) + label[6:]
         boxes.append(list(map(float, box)))
 
         ids.append(int(label[1]))
