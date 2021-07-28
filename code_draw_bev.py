@@ -167,7 +167,7 @@ def mapfusion_draw_det_results(type):
                     result_infos.update({frame_name: frame_info}) 
 
 
-    save_img_folder = os.path.join("{}_imgs".format(type))
+    save_img_folder = os.path.join("data/{}_imgs".format(type))
     if not os.path.exists(save_img_folder):
         os.mkdir(save_img_folder)
 
