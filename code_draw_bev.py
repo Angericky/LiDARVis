@@ -93,10 +93,10 @@ def draw_boxes_on_bev(bev, boxes, pc_range, resolution, pred=True, ids=None, col
         if color_list is not None:
             color = color_list[idx % len(color_list)] 
 
-        cv2.line(bev, p0, p1, color, 2)
-        cv2.line(bev, p1, p2, color, 2)
-        cv2.line(bev, p2, p3, color, 2)
-        cv2.line(bev, p3, p0, color, 2)
+        cv2.line(bev, p0, p1, color, 3)
+        cv2.line(bev, p1, p2, color, 3)
+        cv2.line(bev, p2, p3, color, 3)
+        cv2.line(bev, p3, p0, color, 3)
 
         if ids: 
             id = ids[idx]
