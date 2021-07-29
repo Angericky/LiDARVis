@@ -92,10 +92,10 @@ def draw_boxes_on_bev(bev, boxes, pc_range, resolution, pred=True, ids=None):
         else:
             color = (0, 255, 255)
 
-        cv2.line(bev, p0, p1, color, 1)
-        cv2.line(bev, p1, p2, color, 1)
-        cv2.line(bev, p2, p3, color, 1)
-        cv2.line(bev, p3, p0, color, 1)
+        cv2.line(bev, p0, p1, color, 2)
+        cv2.line(bev, p1, p2, color, 2)
+        cv2.line(bev, p2, p3, color, 2)
+        cv2.line(bev, p3, p0, color, 2)
 
         if ids: 
             id = ids[idx]
@@ -204,7 +204,7 @@ def mapfusion_draw_det_results(type):
         pcd = np.nan_to_num(pcd)
 
         # render bev image
-        pc_range = 60
+        pc_range = 80
         resolution = 0.1
         rows = int(pc_range * 2 / resolution)
 
