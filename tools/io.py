@@ -1,4 +1,6 @@
 import os, numpy as np
+from pypcd import pypcd
+
 
 def load_det_labels_from_single_frame(result_frame_path):
     '''Reading labels from a txt file
@@ -64,3 +66,22 @@ def load_trk_labels_from_single_sequence(result_sequence_path):
         sequence_info[frame_id] = frame_info
 
     return sequence_info
+
+
+def read_file_apolloscape(path, tries=2, num_point_feature=4, painted=False):
+    try:
+        assert path.exists()
+        pc = pypcd.PointCloud.from_path(path)
+        x = pc.pc_data['x']
+        y = pc.pc_data['y']
+        z = pc.pc_data['z']
+        if 'intensity' in pc.fields:
+            intensity = pc.pc_data['intensity'].astype(np.float32) / 255.0
+        else:
+            intensity = np.ones_like(x)
+        pointcloud = np.vstack((x, y, z, intensity))
+        pointcloud = pointcloud.transpose(1, 0)
+        pointcloud = pointcloud.reshape(-1, 4).astype(np.float32)
+        return pointcloud
+    except:
+        print("path: {} not exists".format(path))
