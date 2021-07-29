@@ -47,7 +47,7 @@ def generate_colors():
     return color_list
 
 
-def draw_boxes_on_bev(bev, boxes, pc_range, resolution, pred=True, ids=None, color_list=None):
+def draw_boxes_on_bev(bev, boxes, pc_range, resolution, pred=True, ids=None, color_list=None, show_ids=False):
     for idx, box in enumerate(boxes):
         center = box[3:6]
         length,wid,height = box[:3]
@@ -91,14 +91,14 @@ def draw_boxes_on_bev(bev, boxes, pc_range, resolution, pred=True, ids=None, col
             color = (0, 255, 255)
         
         if color_list is not None:
-            color = color_list[idx % len(color_list)] 
+            color = color_list[ids[idx] % len(color_list)] 
 
         cv2.line(bev, p0, p1, color, 3)
         cv2.line(bev, p1, p2, color, 3)
         cv2.line(bev, p2, p3, color, 3)
         cv2.line(bev, p3, p0, color, 3)
 
-        if ids: 
+        if show_ids: 
             id = ids[idx]
             cv2.putText(bev, str(id), p0, cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 4)
     
@@ -199,9 +199,9 @@ def mapfusion_draw_det_results(type, show_ids, show_color):
             bev = draw_boxes_on_bev(bev, boxes, pc_range, resolution)
         elif type == "trk":
             boxes = result_infos[result_frame_name]["boxes"]
-            ids = result_infos[result_frame_name]["ids"] if show_ids else None
+            ids = result_infos[result_frame_name]["ids"]
             color_list = generate_colors() if show_color else None
-            bev = draw_boxes_on_bev(bev, boxes, pc_range, resolution, ids=ids, color_list=color_list)
+            bev = draw_boxes_on_bev(bev, boxes, pc_range, resolution, ids=ids, color_list=color_list, show_ids=show_ids)
 
         # cv2.imshow('bev', bev)
         # cv2.waitKey(0)
