@@ -1,30 +1,11 @@
 import os
 import numpy as np
 from pathlib import Path
-from pypcd import pypcd
 import cv2
 from tqdm import tqdm
+import colorsys
 
 from tools import io
-
-def read_file_apolloscape(path, tries=2, num_point_feature=4, painted=False):
-    try:
-        assert path.exists()
-        pc = pypcd.PointCloud.from_path(path)
-        x = pc.pc_data['x']
-        y = pc.pc_data['y']
-        z = pc.pc_data['z']
-        if 'intensity' in pc.fields:
-            intensity = pc.pc_data['intensity'].astype(np.float32) / 255.0
-        else:
-            intensity = np.ones_like(x)
-        pointcloud = np.vstack((x, y, z, intensity))
-        pointcloud = pointcloud.transpose(1, 0)
-        pointcloud = pointcloud.reshape(-1, 4).astype(np.float32)
-        return pointcloud
-    except:
-        print("path: {} not exists".format(path))
-
 
 
 def convert_lidar_coords_to_image_coords(points, H, W, pc_range, resolution):
@@ -43,7 +24,30 @@ def convert_lidar_coords_to_image_coords(points, H, W, pc_range, resolution):
     return bev
 
 
-def draw_boxes_on_bev(bev, boxes, pc_range, resolution, pred=True, ids=None):
+# adapted from https://github.com/matterport/Mask_RCNN/blob/master/mrcnn/visualize.py
+def generate_colors():
+    """
+    Generate random colors.
+    To get visually distinct colors, generate them in HSV space then
+    convert to RGB.
+    """
+    hex_colors = ["D32F2F", "FF4081", "#9C27B0", "#7B1FA2", "#303F9F", 
+            "#448AFF", "#03A9F4", "#00BCD4", "#009688", "#4CAF50",
+            "#8BC34A", "#CDDC39", "#FFEB3B", "#FFC107", "#FF9800",
+            "#FF5722", "#795548", "#607D8B"]
+    def Hex_to_RGB(hex):
+        r = int(hex[1:3],16)
+        g = int(hex[3:5],16)
+        b = int(hex[5:7], 16)
+        rgb = (r, g, b)
+        return rgb
+    color_list = []
+    for hex_color in hex_colors:
+        color_list.append(Hex_to_RGB(hex_color))
+    return color_list
+
+
+def draw_boxes_on_bev(bev, boxes, pc_range, resolution, pred=True, ids=None, color_list=None):
     for idx, box in enumerate(boxes):
         center = box[3:6]
         length,wid,height = box[:3]
@@ -81,16 +85,13 @@ def draw_boxes_on_bev(bev, boxes, pc_range, resolution, pred=True, ids=None):
         #p2 = (rows - int(p2[0]) - 1,  int(p2[1]))
         #p3 = (rows - int(p3[0]) - 1,  int(p3[1]))
 
-
-        '''rectify_point_in_img(p0, draw_height, draw_height);
-        rectify_point_in_img(p1, draw_height, draw_height);
-        rectify_point_in_img(p2, draw_height, draw_height);
-        rectify_point_in_img(p3, draw_height, draw_height);'''
-
         if pred == True:
             color = (255, 255, 0)
         else:
             color = (0, 255, 255)
+        
+        if color_list is not None:
+            color = color_list[idx % len(color_list)] 
 
         cv2.line(bev, p0, p1, color, 2)
         cv2.line(bev, p1, p2, color, 2)
@@ -104,25 +105,7 @@ def draw_boxes_on_bev(bev, boxes, pc_range, resolution, pred=True, ids=None):
     return bev
 
 
-def mapfusion_draw_det_results(type):
-    # token_info_map = {}
-    
-    # nuscenes_infos_path = r"D:/nuscenes_infos_10sweeps_train.pkl"
-    # with open(nuscenes_infos_path, 'rb') as Finfo:
-    #     nuscenes_infos = pickle.load(Finfo)
-    #     for info in nuscenes_infos:
-    #         key = info['token']
-    #         value = info['gt_boxes']
-    #         token_info_map[key] = value
-
-    # nuscenes_infos_path = r"D:/nuscenes_infos_10sweeps_val.pkl"
-    # with open(nuscenes_infos_path, 'rb') as Finfo2:
-    #     nuscenes_infos = pickle.load(Finfo2)
-    #     for info in nuscenes_infos:
-    #         key = info['token']
-    #         value = info['gt_boxes']
-    #         token_info_map[key] = value
-    
+def mapfusion_draw_det_results(type, show_ids, show_color):
     PCDS_ROOT = "data/point_cloud_data"
 
     output_path = "data/det_vis"
@@ -192,15 +175,14 @@ def mapfusion_draw_det_results(type):
     keys = list(result_infos.keys())
     keys.sort()
 
-    total = len(keys)
+    total_frames_num = len(keys)
 
-
-    for i in tqdm(range(len(keys))):
+    for i in tqdm(range(total_frames_num)):
         result_frame_name = keys[i]
         # load pcd
         frame_id = result_frame_name
         pcd_path = os.path.join(PCDS_ROOT, frame_id.split('.')[0] + '.pcd')
-        pcd = read_file_apolloscape(Path(pcd_path))
+        pcd = io.read_file_apolloscape(Path(pcd_path))
         pcd = np.nan_to_num(pcd)
 
         # render bev image
@@ -217,9 +199,9 @@ def mapfusion_draw_det_results(type):
             bev = draw_boxes_on_bev(bev, boxes, pc_range, resolution)
         elif type == "trk":
             boxes = result_infos[result_frame_name]["boxes"]
-            ids = result_infos[result_frame_name]["ids"]
-            bev = draw_boxes_on_bev(bev, boxes, pc_range, resolution, ids=ids)
-
+            ids = result_infos[result_frame_name]["ids"] if show_ids else None
+            color_list = generate_colors() if show_color else None
+            bev = draw_boxes_on_bev(bev, boxes, pc_range, resolution, ids=ids, color_list=color_list)
 
         # cv2.imshow('bev', bev)
         # cv2.waitKey(0)
