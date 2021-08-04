@@ -1,5 +1,24 @@
 import os, numpy as np
 from pypcd import pypcd
+from pyquaternion import Quaternion     #　四元数的库
+
+
+def load_pose(pose_path, offset_x = 0, offset_y = 0):
+    data = np.fromfile(pose_path,  sep=' ')
+    trans = data[2:5]
+    trans[0] -= offset_x
+    trans[1] -= offset_y
+    x,y,z,w = data[5:9]
+
+    quat = Quaternion(w,x,y,z)
+    rotation = quat.rotation_matrix
+
+    T = np.zeros((4,4), np.float32)
+    T[:3, :3] = rotation
+    T[:3, 3] = trans
+    T[3, 3] = 1
+
+    return T
 
 
 def load_det_labels_from_single_frame(result_frame_path):
@@ -68,7 +87,7 @@ def load_trk_labels_from_single_sequence(result_sequence_path):
     return sequence_info
 
 
-def read_file_apolloscape(path, tries=2, num_point_feature=4, painted=False):
+def load_pcd_ACG(path, tries=2, num_point_feature=4, painted=False):
     try:
         assert path.exists()
         pc = pypcd.PointCloud.from_path(path)
