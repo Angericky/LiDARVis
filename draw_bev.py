@@ -132,8 +132,10 @@ def mapfusion_draw_det_results(type, show_ids, show_color):
         proposed_result_folder = "data/results/"
         classes_folder = os.listdir(proposed_result_folder)
         classes_folder.sort()
+        
         for class_folder in classes_folder:
             classes_folder_path = os.path.join(proposed_result_folder, class_folder + "/data")
+            
             result_sequence_names = []
             for sequence_file in os.listdir(classes_folder_path):
                 if sequence_file.endswith('txt'):
@@ -179,10 +181,11 @@ def mapfusion_draw_det_results(type, show_ids, show_color):
 
     for i in tqdm(range(total_frames_num)):
         result_frame_name = keys[i]
+
         # load pcd
         frame_id = result_frame_name
         pcd_path = os.path.join(PCDS_ROOT, frame_id.split('.')[0] + '.pcd')
-        pcd = io.read_file_apolloscape(Path(pcd_path))
+        pcd = io.load_pcd_ACG(Path(pcd_path))
         pcd = np.nan_to_num(pcd)
 
         # render bev image
@@ -203,8 +206,6 @@ def mapfusion_draw_det_results(type, show_ids, show_color):
             color_list = generate_colors() if show_color else None
             bev = draw_boxes_on_bev(bev, boxes, pc_range, resolution, ids=ids, color_list=color_list, show_ids=show_ids)
 
-        # cv2.imshow('bev', bev)
-        # cv2.waitKey(0)
         
         cv2.imwrite(os.path.join(save_img_folder, frame_id.split('.')[0] + '.png'), bev)
         #print("generate frame: {}".format(frame_id.split('.')[0]))
