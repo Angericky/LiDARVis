@@ -1,5 +1,5 @@
 import argparse
-from code_draw_bev import mapfusion_draw_det_results
+from draw_bev import mapfusion_draw_det_results
 
 def parse_args():
     parser = argparse.ArgumentParser()
