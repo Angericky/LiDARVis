@@ -3,6 +3,7 @@ import numpy as np
 from pathlib import Path
 import copy 
 import re
+import multiprocessing
 import tools.io as io
 from tools.trans import trans_based_on_pose
 
@@ -60,6 +61,14 @@ def read_and_trans_pcd(sweep_name, base_pose, pose_dir, data_folder):
     return sweep_trans_pc
 
 
+def run(sweep_name, base_pose, pose_dir, data_folder, output_folder):
+    sweep_trans_pc = read_and_trans_pcd(sweep_name, base_pose, pose_dir, data_folder)
+
+    output_path = os.path.join(output_folder, sweep_name.split('.')[0] + ".xyz")
+    np.savetxt(output_path, sweep_trans_pc, fmt='%.18e', delimiter=' ', newline='\n', encoding=None)
+    print("Sweep: {} has been generated".format(output_path))
+
+
 if __name__ == '__main__':
     # define args
     data_folder = "data/point_cloud_data"
@@ -85,12 +94,13 @@ if __name__ == '__main__':
         base_pose = io.load_pose(os.path.join(pose_dir, "{}_{}.txt".format(sequence, base_sweep_id)))
         sequence_sweep_names = list(filter(lambda x: re.match('{}_*'.format(sequence), x) != None, data_sweep_names))  # 生成新列表
         print(sequence_sweep_names)
-        for sweep_name in sequence_sweep_names:
-            sweep_trans_pc = read_and_trans_pcd(sweep_name, base_pose, pose_dir, data_folder)
 
-            output_path = os.path.join(output_folder, sweep_name.split('.')[0] + ".xyz")
-            np.savetxt(output_path, sweep_trans_pc, fmt='%.18e', delimiter=' ', newline='\n', encoding=None)
-            print("Sweep: {} has been generated".format(output_path))
+        pool = multiprocessing.Pool(20)
+        for sweep_name in sequence_sweep_names:
+            pool.apply_async(func=run, args=(sweep_name, base_pose, pose_dir, data_folder, output_folder))
+
+        pool.close()
+        pool.join()
 
     # transform and save boxes by base ego pose 
     # proposed_result_folder = "data/final_result_det"
