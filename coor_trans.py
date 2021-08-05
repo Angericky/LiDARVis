@@ -4,8 +4,18 @@ from pathlib import Path
 import copy 
 import re
 import multiprocessing
+import argparse
 import tools.io as io
 from tools.trans import trans_based_on_pose
+
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--fmt", choices=["xyz", "npy"], default="npy")
+    parser.add_argument("--save_pc", action="store_true")
+    parser.add_argument("--save_box", action="store_true")
+    args = parser.parse_args()
+    return args
 
 
 def load_det_result(proposed_result_folder):
@@ -61,15 +71,23 @@ def read_and_trans_pcd(sweep_name, base_pose, pose_dir, data_folder):
     return sweep_trans_pc
 
 
-def run(sweep_name, base_pose, pose_dir, data_folder, output_folder):
+def run(sweep_name, base_pose, pose_dir, data_folder, output_folder, fmt):
     sweep_trans_pc = read_and_trans_pcd(sweep_name, base_pose, pose_dir, data_folder)
 
-    output_path = os.path.join(output_folder, sweep_name.split('.')[0] + ".xyz")
-    np.savetxt(output_path, sweep_trans_pc, fmt='%.18e', delimiter=' ', newline='\n', encoding=None)
+    output_path = os.path.join(output_folder, sweep_name.split('.')[0] + ".{}".format(fmt))
+    if fmt == "npy":
+        np.save(output_path, sweep_trans_pc)
+    elif fmt == "xyz":
+        np.savetxt(output_path, sweep_trans_pc, fmt='%.18e', delimiter=' ', newline='\n', encoding=None)
+    else:
+        raise NotImplementedError
+    
     print("Sweep: {} has been generated".format(output_path))
 
 
 if __name__ == '__main__':
+    args = parse_args()
+
     # define args
     data_folder = "data/point_cloud_data"
     pose_dir = "data/point_cloud_pose_data"
@@ -89,19 +107,20 @@ if __name__ == '__main__':
     data_sweep_names.sort()
     sequence_names = sorted(list(sequence_names))
 
-    # transform and save points by base ego pose 
-    for sequence in sequence_names:
-        base_pose = io.load_pose(os.path.join(pose_dir, "{}_{}.txt".format(sequence, base_sweep_id)))
-        sequence_sweep_names = list(filter(lambda x: re.match('{}_*'.format(sequence), x) != None, data_sweep_names))  # 生成新列表
-        print(sequence_sweep_names)
+    if args.save_pc:
+        # transform and save points by base ego pose 
+        for sequence in sequence_names:
+            base_pose = io.load_pose(os.path.join(pose_dir, "{}_{}.txt".format(sequence, base_sweep_id)))
+            sequence_sweep_names = list(filter(lambda x: re.match('{}_*'.format(sequence), x) != None, data_sweep_names))  # 生成新列表
+            print(sequence_sweep_names)
 
-        pool = multiprocessing.Pool(20)
-        for sweep_name in sequence_sweep_names:
-            pool.apply_async(func=run, args=(sweep_name, base_pose, pose_dir, data_folder, output_folder))
+            pool = multiprocessing.Pool(20)
+            for sweep_name in sequence_sweep_names:
+                pool.apply_async(func=run, args=(sweep_name, base_pose, pose_dir, data_folder, output_folder, args.fmt))
+            pool.close()
+            pool.join()
 
-        pool.close()
-        pool.join()
-
+    # if args.save_box:
     # transform and save boxes by base ego pose 
     # proposed_result_folder = "data/final_result_det"
     # result_infos = load_det_result(proposed_result_folder)
