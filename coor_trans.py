@@ -5,8 +5,14 @@ import copy
 import re
 import multiprocessing
 import argparse
+# from mayavi import mlab
+import cv2
+
 import tools.io as io
 from tools.trans import trans_based_on_pose
+from tools.box import boxes_to_corners_3d
+from tools import box as V
+from draw_bev import convert_lidar_coords_to_image_coords, draw_boxes_on_bev
 
 
 def parse_args():
@@ -14,6 +20,7 @@ def parse_args():
     parser.add_argument("--fmt", choices=["xyz", "npy"], default="npy")
     parser.add_argument("--save_pc", action="store_true")
     parser.add_argument("--save_box", action="store_true")
+    parser.add_argument("--save_img", action="store_true")
     args = parser.parse_args()
     return args
 
@@ -45,7 +52,7 @@ def load_det_result(proposed_result_folder):
     return result_infos
 
  
-def read_and_trans_pcd(sweep_name, base_pose, pose_dir, data_folder):
+def read_and_trans_pcd(sweep_name, base_pose, sweep_pose, data_folder):
     """ 
         Args: 
             str, the sweep path,
@@ -62,8 +69,6 @@ def read_and_trans_pcd(sweep_name, base_pose, pose_dir, data_folder):
     intensity = copy.deepcopy(sweep_pc[:, 3])
     sweep_pc[:, 3] = 1
 
-    sweep_pose = io.load_pose(os.path.join(pose_dir, sweep_name.split('.')[0] + ".txt"))    # (4, 4)
-
     sweep_trans_pc = trans_based_on_pose(sweep_pc, sweep_pose, base_pose)
 
     sweep_trans_pc[:,3] = intensity
@@ -72,7 +77,8 @@ def read_and_trans_pcd(sweep_name, base_pose, pose_dir, data_folder):
 
 
 def run(sweep_name, base_pose, pose_dir, data_folder, output_folder, fmt):
-    sweep_trans_pc = read_and_trans_pcd(sweep_name, base_pose, pose_dir, data_folder)
+    sweep_pose = io.load_pose(os.path.join(pose_dir, sweep_name.split('.')[0] + ".txt"))    # (4, 4)
+    sweep_trans_pc = read_and_trans_pcd(sweep_name, base_pose, sweep_pose, data_folder)
 
     output_path = os.path.join(output_folder, sweep_name.split('.')[0] + ".{}".format(fmt))
     if fmt == "npy":
@@ -120,11 +126,81 @@ if __name__ == '__main__':
             pool.close()
             pool.join()
 
-    # if args.save_box:
-    # transform and save boxes by base ego pose 
-    # proposed_result_folder = "data/final_result_det"
-    # result_infos = load_det_result(proposed_result_folder)
-    # #'boxes': (M, 8), float, (h, w, l, x, y, z, theta, conf)
-    # for sweep_name in result_infos.keys():
-    #     boxes_8dim = result_infos[sweep_name]['boxes']
-    #     boxes_coords = 
+
+    if args.save_box:
+        # transform and save boxes by base ego pose 
+        proposed_result_folder = "data/final_result_det"
+        result_infos = load_det_result(proposed_result_folder)
+        save_img_folder = "data/trans_vis"
+        output_folder = "data/result_det_trans"
+
+        if not os.path.exists(output_folder):
+            os.mkdir(output_folder)
+
+        # 'boxes': (M, 8), float, (h, w, l, x, y, z, theta, conf)
+        for sweep_id in result_infos.keys():
+            pose_path = os.path.join(pose_dir, sweep_id + ".txt")
+            sweep_pose = io.load_pose(pose_path)    # (4, 4)
+            boxes = np.array(result_infos[sweep_id]['boxes'])  # (M, 8)
+
+            boxes_to_draw = np.concatenate((boxes[:, 3:6], boxes[:, :3], boxes[:, 6:7]), axis=1)
+            
+            centers = boxes_to_draw[:, :3]
+            centers_all = centers.reshape(-1, 3)
+            dim = np.ones((centers.shape[0], 1))
+            centers_4d = np.concatenate((centers_all, dim), axis=1)
+
+            sequence = sweep_id.split("_")[0]
+            base_pose = io.load_pose(os.path.join(pose_dir, "{}_{}.txt".format(sequence, base_sweep_id)))
+            centers_trans = trans_based_on_pose(centers_4d, sweep_pose, base_pose)
+            centers_trans = centers_trans[:, :3]
+
+            data = np.fromfile(pose_path,  sep=' ')
+            x,y,z,w = data[5:9]
+
+            yaw = np.arcsin(2*(w*y - z*x))
+            boxes_trans = np.zeros_like(boxes_to_draw)
+            boxes_trans[:, :3] = centers_trans
+            boxes_trans[:, 3:6] = boxes_to_draw[:, 3:6]
+            boxes_trans[:, 6] = boxes_to_draw[:, 6]
+
+            boxes_trans = np.concatenate((boxes_trans[:, 3:6], boxes_trans[:, :3], boxes_trans[:, 6:7]), axis=1)
+
+            # save as det pred format
+            output_file = os.path.join(output_folder, sweep_id + ".txt")
+            with open(output_file, "a+") as f:
+                for i in range(boxes_trans.shape[0]):
+                    f.write("{} -1 -1 0 0 0 0 {} {} {} {} {} {} {} {}\n".format(
+                    result_infos[sweep_id]["labels"][i], *boxes_trans[i], boxes[i, -1]))
+
+            if args.save_img:
+                sweep_name = sweep_id + ".pcd"
+            
+                # read 4-dim points
+                sweep_trans_pc = read_and_trans_pcd(sweep_name, base_pose, sweep_pose, data_folder)
+
+                # render bev image
+                pc_range = 80
+                resolution = 0.1
+                rows = int(pc_range * 2 / resolution)
+
+                # generate bev map
+                sweep_path = os.path.join(data_folder, sweep_name)
+                sweep_pc = io.load_pcd_ACG(Path(sweep_path)) # (N, 4)
+                bev = convert_lidar_coords_to_image_coords(sweep_trans_pc, rows, rows, pc_range, resolution)
+
+                # draw boxes
+                bev = draw_boxes_on_bev(bev, boxes_trans, pc_range, resolution)
+
+                # cv2.namedWindow('bev', 0)    
+                # cv2.resizeWindow('bev', 800, 800)  
+                # cv2.imshow("bev", bev)
+            
+                cv2.imwrite(os.path.join(save_img_folder, sweep_id.split('.')[0] + '.png'), bev)
+            # cv2.waitKey()
+
+            # V.draw_scenes(
+            #     points=sweep_pc, ref_boxes=boxes_to_draw,
+            #     ref_scores=boxes[:, 7], frame_id=int(sweep_name)
+            # )
+            # mlab.show(stop=True)

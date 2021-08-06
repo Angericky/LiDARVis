@@ -11,5 +11,3 @@ def trans_based_on_pose(pc, T, T_base):
 
     #pc_new = np.linalg.inv(T_base - T_offset) @ ((T - T_offset) @ pc)
     return pc_new.T
-
-
