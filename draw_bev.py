@@ -48,6 +48,9 @@ def generate_colors():
 
 
 def draw_boxes_on_bev(bev, boxes, pc_range, resolution, pred=True, ids=None, color_list=None, show_ids=False):
+    """
+        boxes: (l, w, h, x, y, z, yaw)
+    """
     for idx, box in enumerate(boxes):
         center = box[3:6]
         length,wid,height = box[:3]

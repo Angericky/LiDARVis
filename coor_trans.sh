@@ -1,1 +1,1 @@
-python coor_trans.py  --fmt npy --save_pc --save_box
+python coor_trans.py  --fmt npy  --save_box

@@ -21,6 +21,13 @@ def parse_args():
     parser.add_argument("--save_pc", action="store_true")
     parser.add_argument("--save_box", action="store_true")
     parser.add_argument("--save_img", action="store_true")
+    # local_to_global: Input order: one frame with all classes
+    # cls, -1, -1, 0, 0, 0, 0, 0
+    # l, w, h, x, y, z, yaw, score
+    # global_to_local: Input order: one sequence in one classes
+    # 0, 0, 0, 0, 0, 0, score, h, w, l, x, y, z, yaw
+    parser.add_argument("--trans", choices=["local_to_global", "global_to_local"], default="local_to_global")
+
     args = parser.parse_args()
     return args
 
@@ -81,6 +88,7 @@ def run(sweep_name, base_pose, pose_dir, data_folder, output_folder, fmt):
     sweep_trans_pc = read_and_trans_pcd(sweep_name, base_pose, sweep_pose, data_folder)
 
     output_path = os.path.join(output_folder, sweep_name.split('.')[0] + ".{}".format(fmt))
+    
     if fmt == "npy":
         np.save(output_path, sweep_trans_pc)
     elif fmt == "xyz":
@@ -98,10 +106,13 @@ if __name__ == '__main__':
     data_folder = "data/point_cloud_data"
     pose_dir = "data/point_cloud_pose_data"
     base_sweep_id = 1
-    output_folder = "data/pcd_transform"
-
-    if not os.path.exists(output_folder):
-        os.mkdir(output_folder)
+    pc_output_folder = "data/pcd_transform_xyz"
+    proposed_result_folder = "data/final_result_det"
+    save_img_folder = "data/trans_vis"
+    box_output_folder = "data/result_det_trans"
+    
+    if not os.path.exists(pc_output_folder):
+        os.mkdir(pc_output_folder)
 
     # get sweep names and sequence names
     data_sweep_names = []
@@ -116,58 +127,71 @@ if __name__ == '__main__':
     if args.save_pc:
         # transform and save points by base ego pose 
         for sequence in sequence_names:
-            base_pose = io.load_pose(os.path.join(pose_dir, "{}_{}.txt".format(sequence, base_sweep_id)))
-            sequence_sweep_names = list(filter(lambda x: re.match('{}_*'.format(sequence), x) != None, data_sweep_names))  # 生成新列表
-            print(sequence_sweep_names)
+            if sequence == '441531':
+                base_sweep_id = 241
+                base_pose = io.load_pose(os.path.join(pose_dir, "{}_{}.txt".format(sequence, base_sweep_id)))
+                sequence_sweep_names = list(filter(lambda x: re.match('{}_*'.format(sequence), x) != None, data_sweep_names))  # 生成新列表
+                print(sequence_sweep_names)
+                import pdb
+                pdb.set_trace()
+                # pool = multiprocessing.Pool(20)
+                # for sweep_name in sequence_sweep_names:
+                #     pool.apply_async(func=run, args=(sweep_name, base_pose, pose_dir, data_folder, pc_output_folder, args.fmt))
+                # pool.close()
+                # pool.join()
 
-            pool = multiprocessing.Pool(20)
-            for sweep_name in sequence_sweep_names:
-                pool.apply_async(func=run, args=(sweep_name, base_pose, pose_dir, data_folder, output_folder, args.fmt))
-            pool.close()
-            pool.join()
+                for sweep_name in sequence_sweep_names:
+                    run(sweep_name, base_pose, pose_dir, data_folder, pc_output_folder, args.fmt)
 
 
     if args.save_box:
         # transform and save boxes by base ego pose 
-        proposed_result_folder = "data/final_result_det"
+
         result_infos = load_det_result(proposed_result_folder)
-        save_img_folder = "data/trans_vis"
-        output_folder = "data/result_det_trans"
 
-        if not os.path.exists(output_folder):
-            os.mkdir(output_folder)
+        if not os.path.exists(box_output_folder):
+            os.mkdir(box_output_folder)
 
-        # 'boxes': (M, 8), float, (h, w, l, x, y, z, theta, conf)
+        # 'boxes': (M, 8), float, (h, w, l, x, y, z, theta, conf) 
         for sweep_id in result_infos.keys():
             pose_path = os.path.join(pose_dir, sweep_id + ".txt")
             sweep_pose = io.load_pose(pose_path)    # (4, 4)
             boxes = np.array(result_infos[sweep_id]['boxes'])  # (M, 8)
 
+            import pdb
+            pdb.set_trace()
             boxes_to_draw = np.concatenate((boxes[:, 3:6], boxes[:, :3], boxes[:, 6:7]), axis=1)
             
             centers = boxes_to_draw[:, :3]
             centers_all = centers.reshape(-1, 3)
             dim = np.ones((centers.shape[0], 1))
-            centers_4d = np.concatenate((centers_all, dim), axis=1)
+            centers_4dim = np.concatenate((centers_all, dim), axis=1)
 
             sequence = sweep_id.split("_")[0]
-            base_pose = io.load_pose(os.path.join(pose_dir, "{}_{}.txt".format(sequence, base_sweep_id)))
-            centers_trans = trans_based_on_pose(centers_4d, sweep_pose, base_pose)
+            base_pose_path = os.path.join(pose_dir, "{}_{}.txt".format(sequence, base_sweep_id))
+            
+            if args.trans == "local_to_global":
+                base_pose = io.load_pose(base_pose_path)
+                ego_pose = np.fromfile(pose_path,  sep=' ')
+            elif args.trans == "global_to_local":
+                ego_pose = io.load_pose(base_pose_path)
+                base_pose = np.fromfile(pose_path,  sep=' ')
+
+            centers_trans = trans_based_on_pose(centers_4dim, sweep_pose, base_pose)
             centers_trans = centers_trans[:, :3]
 
-            data = np.fromfile(pose_path,  sep=' ')
-            x,y,z,w = data[5:9]
+            x,y,z,w = ego_pose[5:9]
 
             yaw = np.arcsin(2*(w*y - z*x))
             boxes_trans = np.zeros_like(boxes_to_draw)
             boxes_trans[:, :3] = centers_trans
-            boxes_trans[:, 3:6] = boxes_to_draw[:, 3:6]
-            boxes_trans[:, 6] = boxes_to_draw[:, 6]
+            boxes_trans[:, 3:6] = boxes_to_draw[:, 3:6] # copy original size dim
+            boxes_trans[:, 6] = boxes_to_draw[:, 6] 
 
             boxes_trans = np.concatenate((boxes_trans[:, 3:6], boxes_trans[:, :3], boxes_trans[:, 6:7]), axis=1)
 
             # save as det pred format
-            output_file = os.path.join(output_folder, sweep_id + ".txt")
+            output_file = os.path.join(box_output_folder, sweep_id + ".txt")
             with open(output_file, "a+") as f:
                 for i in range(boxes_trans.shape[0]):
                     f.write("{} -1 -1 0 0 0 0 {} {} {} {} {} {} {} {}\n".format(
